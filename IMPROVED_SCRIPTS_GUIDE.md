@@ -25,9 +25,9 @@ export HF_ENDPOINT=https://hf-mirror.com
 
 确保以下模型文件已下载：
 - `checkpoints/megasam_final.pth` - MegaSaM主模型
-- `Depth-Anything/checkpoints/depth_anything_vitl14.pth` - Depth-Anything模型
+- `Depth-Anything/checkpoints/depth_anything_vitl14.pth` - [Depth-Anything模型](https://drive.google.com/file/d/14Yve37sf3qJ7yZFeieL8N6YwpQ5tpFHu/view?usp=drive_link)
 - `cvd_opt/raft-things.pth` - RAFT光流模型（可选，用于CVD优化）
-- `base/xformers-0.0.22.post7-py310_cu11.8.0_pyt2.0.1.tar.bz2` - xformers 安装包
+- `base/xformers-0.0.22.post7-py310_cu11.8.0_pyt2.0.1.tar.bz2` - [xformers 安装包](https://drive.google.com/file/d/1WPmOFUJ2ScFlm21h23uVhkgGqfGMYrVF/view?usp=drive_link)
 
 ---
 
