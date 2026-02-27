@@ -1,6 +1,6 @@
 # MEGA-SAM 自定义视频测试指南
 
-中文文档| [English](./ENG_IMPROVED_SCRIPTS_GUIDE.md) 
+中文文档| [English](./README.md) 
 
 原文为 CVPR 2025（Best Paper Honorable Mention），题目 [MegaSaM：Accurate, Fast and Robust Structure and Motion from Casual Dynamic Videos](https://github.com/mega-sam/mega-sam)
 本指南介绍如何使用改进版v2脚本处理自己的视频数据。
