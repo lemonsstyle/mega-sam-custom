@@ -25,9 +25,9 @@ export HF_ENDPOINT=https://hf-mirror.com
 
 Make sure the following model files have been downloaded:
 - `checkpoints/megasam_final.pth` - MegaSaM main model
-- `Depth-Anything/checkpoints/depth_anything_vitl14.pth` - [Depth-Anything model](https://drive.google.com/file/d/1WPmOFUJ2ScFlm21h23uVhkgGqfGMYrVF/view?usp=drive_link)
+- `Depth-Anything/checkpoints/depth_anything_vitl14.pth` - [Depth-Anything model](https://drive.google.com/file/d/14Yve37sf3qJ7yZFeieL8N6YwpQ5tpFHu/view?usp=drive_link)
 - `cvd_opt/raft-things.pth` - RAFT optical flow model (optional, used for CVD optimization)
-- `base/xformers-0.0.22.post7-py310_cu11.8.0_pyt2.0.1.tar.bz2` - [xformers installation package](https://drive.google.com/file/d/14Yve37sf3qJ7yZFeieL8N6YwpQ5tpFHu/view?usp=drive_link)
+- `base/xformers-0.0.22.post7-py310_cu11.8.0_pyt2.0.1.tar.bz2` - [xformers installation package](https://drive.google.com/file/d/1WPmOFUJ2ScFlm21h23uVhkgGqfGMYrVF/view?usp=drive_link)
 
 ---
 
