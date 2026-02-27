@@ -125,15 +125,6 @@ python ./visual/visualize_results.py test \
 - Generates a standalone HTML file (~25-50MB)
 - Contains RGB images, depth maps, and camera trajectories
 
-
-
-**Features:**
-- Play/pause video sequence
-- Frame-by-frame RGB and depth map viewing
-- Top-down view of camera trajectory
-- Per-frame pose information display
-- Keyboard shortcuts (Space, Left/Right arrows)
-
 ---
 
 ### Step 4: Visualize Results (3D Point Cloud Version)
@@ -158,15 +149,6 @@ python ./visual/pointcloud_viewer.py test \
 **Access Method (Skip if not using AutoDL):**
 
 Select the instance's custom service and open the address corresponding to port 6006.
-
-
-
-**Features:**
-- 3D point cloud display (with RGB colors)
-- Camera trajectory visualization
-- Mouse interaction controls (rotate, pan, zoom)
-- Real-time point size adjustment
-- Show/hide camera trajectory
 
 **Performance Recommendations:**
 - Quick preview: `--max-points 50000 --sample-frames 5`
