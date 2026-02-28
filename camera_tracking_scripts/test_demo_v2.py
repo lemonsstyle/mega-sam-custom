@@ -173,6 +173,8 @@ if __name__ == "__main__":
   parser.add_argument("--stereo", action="store_true")
   parser.add_argument("--depth", action="store_true")
   parser.add_argument("--upsample", action="store_true")
+  parser.add_argument("--opt_focal", action="store_true", default=True, help="Enable focal length optimization")
+  parser.add_argument("--no_opt_focal", dest="opt_focal", action="store_false", help="Disable focal length optimization")
   parser.add_argument("--scene_name", help="scene_name")
 
   parser.add_argument("--backend_thresh", type=float, default=16.0)
@@ -317,7 +319,7 @@ if __name__ == "__main__":
           aligns=aligns,
           K=K,
       ),
-      _opt_intr=True,
+      _opt_intr=args.opt_focal,
       full_ba=True,
       scene_name=scene_name,
   )
