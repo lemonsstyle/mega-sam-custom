@@ -294,7 +294,7 @@ def generate_html(scene_name, output_path='visualization.html', cvd_dir=None, re
 
             <div class="control-group">
                 <label>速度:</label>
-                <input type="range" id="speedSlider" min="1" max="10" value="5" step="1">
+                <input type="range" id="speedSlider" min="1" max="20" value="5" step="1">
                 <span id="speedInfo">5x</span>
             </div>
         </div>
