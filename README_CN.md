@@ -2,7 +2,10 @@
 
 中文文档| [English](./README.md) 
 
-原文为 CVPR 2025（Best Paper Honorable Mention），题目 [MegaSaM：Accurate, Fast and Robust Structure and Motion from Casual Dynamic Videos](https://github.com/mega-sam/mega-sam)
+原文为 CVPR 2025（Best Paper Honorable Mention）
+
+[MegaSaM：Accurate, Fast and Robust Structure and Motion from Casual Dynamic Videos](https://github.com/mega-sam/mega-sam)
+
 本指南介绍如何使用改进版v2脚本处理自己的视频数据。
 
 ---
