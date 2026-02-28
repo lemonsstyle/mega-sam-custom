@@ -1,82 +1,118 @@
 #!/bin/bash
-# 改进版：支持自定义输出路径的视频帧提取脚本
+# 改进版：所有路径可配置的 MegaSaM 运行脚本
 
 set -e
 
 # ============ 使用说明 ============
 show_usage() {
     cat << EOF
-使用方法: $0 <视频文件> [选项]
+使用方法: $0 [选项]
 
 必需参数:
-  视频文件                   输入视频文件路径
+  --scene-name NAME          场景名称（用于输出文件命名）
+  --data-dir PATH            输入图像序列目录
 
 可选参数:
-  --output-dir PATH          输出目录（默认: data/<视频文件名>）
-  --fps FPS                  提取帧率（默认: 30）
-  --quality QUALITY          JPEG质量 1-31，越小越好（默认: 2）
-  --start-time TIME          开始时间，格式 HH:MM:SS 或秒数（默认: 开头）
-  --duration TIME            持续时间，格式 HH:MM:SS 或秒数（默认: 全部）
+  --output-dir PATH          输出目录（默认: outputs）
+  --recon-dir PATH           重建数据目录（默认: reconstructions）
+  --cvd-output-dir PATH      CVD优化输出目录（默认: 自动设置为output-dir同级的outputs_cvd）
+  --depth-anything-dir PATH  Depth-Anything输出目录（默认: Depth-Anything/video_visualization）
+  --unidepth-dir PATH        UniDepth输出目录（默认: UniDepth/outputs）
+  --gpu-id ID                GPU设备ID（默认: 0）
+  --opt-focal                启用焦距优化
+  --disable-vis              禁用可视化
+  --skip-depth               跳过深度预计算（如果已运行过）
+  --skip-tracking            跳过相机跟踪（如果已运行过）
+  --skip-cvd                 跳过CVD优化
 
 示例:
-  # 基本用法（输出到 data/my_video/）
-  $0 my_video.mp4
+  # 基本用法
+  $0 --scene-name my_video --data-dir data/my_scene
 
-  # 指定输出目录和帧率
-  $0 video.mp4 --output-dir /path/to/output --fps 15
+  # 自定义输出路径
+  $0 --scene-name video1 --data-dir /path/to/images \\
+     --output-dir /path/to/outputs --recon-dir /path/to/recons
 
-  # 提取视频片段（从10秒开始，持续30秒）
-  $0 video.mp4 --start-time 10 --duration 30 --output-dir data/clip1
-
-  # 高质量提取
-  $0 video.mp4 --quality 1 --fps 60
+  # 跳过已完成的步骤
+  $0 --scene-name my_video --data-dir data/my_scene --skip-depth
 
 EOF
     exit 1
 }
 
 # ============ 默认参数 ============
-VIDEO_PATH=""
-OUTPUT_DIR=""
-FPS=30
-QUALITY=2
-START_TIME=""
-DURATION=""
+SCENE_NAME=""
+DATA_DIR=""
+OUTPUT_DIR="outputs"
+RECON_DIR="reconstructions"
+DEPTH_ANYTHING_DIR="Depth-Anything/video_visualization"
+UNIDEPTH_DIR="UniDepth/outputs"
+CVD_OUTPUT_DIR=""  # CVD优化输出目录，默认为空，后面会自动设置
+GPU_ID=0
+OPT_FOCAL=true
+DISABLE_VIS=true
+SKIP_DEPTH=false
+SKIP_TRACKING=false
+SKIP_CVD=false
 
 # ============ 解析命令行参数 ============
-if [ $# -eq 0 ]; then
-    show_usage
-fi
-
-# 先检查是否是帮助请求
-if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-    show_usage
-fi
-
-VIDEO_PATH="$1"
-shift
-
 while [[ $# -gt 0 ]]; do
     case $1 in
+        --scene-name)
+            SCENE_NAME="$2"
+            shift 2
+            ;;
+        --data-dir)
+            DATA_DIR="$2"
+            shift 2
+            ;;
         --output-dir)
             OUTPUT_DIR="$2"
             shift 2
             ;;
-        --fps)
-            FPS="$2"
+        --recon-dir)
+            RECON_DIR="$2"
             shift 2
             ;;
-        --quality)
-            QUALITY="$2"
+        --depth-anything-dir)
+            DEPTH_ANYTHING_DIR="$2"
             shift 2
             ;;
-        --start-time)
-            START_TIME="$2"
+        --unidepth-dir)
+            UNIDEPTH_DIR="$2"
             shift 2
             ;;
-        --duration)
-            DURATION="$2"
+        --cvd-output-dir)
+            CVD_OUTPUT_DIR="$2"
             shift 2
+            ;;
+        --gpu-id)
+            GPU_ID="$2"
+            shift 2
+            ;;
+        --opt-focal)
+            OPT_FOCAL=true
+            shift
+            ;;
+        --no-opt-focal)
+            OPT_FOCAL=false
+            shift
+            ;;
+        --disable-vis)
+            DISABLE_VIS=true
+            shift
+            ;;
+        --skip-depth)
+            SKIP_DEPTH=true
+            shift
+            ;;
+        --skip-tracking)
+            SKIP_TRACKING=true
+            shift
+            ;;
+        --skip-cvd)
+            SKIP_CVD=true
+            shift
             ;;
         -h|--help)
             show_usage
@@ -88,95 +124,206 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# ============ 验证参数 ============
-if [ -z "$VIDEO_PATH" ]; then
-    echo "错误: 必须指定视频文件"
+# ============ 验证必需参数 ============
+if [ -z "$SCENE_NAME" ]; then
+    echo "错误: 必须指定 --scene-name"
     show_usage
 fi
 
-if [ ! -f "$VIDEO_PATH" ]; then
-    echo "错误: 视频文件不存在: $VIDEO_PATH"
-    exit 1
+if [ -z "$DATA_DIR" ]; then
+    echo "错误: 必须指定 --data-dir"
+    show_usage
 fi
 
-# 如果没有指定输出目录，使用视频文件名
-if [ -z "$OUTPUT_DIR" ]; then
-    VIDEO_BASENAME=$(basename "$VIDEO_PATH")
-    VIDEO_NAME="${VIDEO_BASENAME%.*}"
-    OUTPUT_DIR="data/$VIDEO_NAME"
+# 如果没有指定CVD输出目录，自动设置为output-dir同级的outputs_cvd
+if [ -z "$CVD_OUTPUT_DIR" ]; then
+    # 获取OUTPUT_DIR的父目录
+    OUTPUT_PARENT=$(dirname "$OUTPUT_DIR")
+    if [ "$OUTPUT_PARENT" = "." ]; then
+        CVD_OUTPUT_DIR="outputs_cvd"
+    else
+        CVD_OUTPUT_DIR="$OUTPUT_PARENT/outputs_cvd"
+    fi
 fi
-
-# 检查 ffmpeg
-if ! command -v ffmpeg &> /dev/null; then
-    echo "错误: 未找到 ffmpeg"
-    echo "请安装: sudo apt-get install ffmpeg"
-    exit 1
-fi
-
-# 创建输出目录
-mkdir -p "$OUTPUT_DIR"
-
-echo "已创建输出目录: $OUTPUT_DIR"
 
 # ============ 显示配置 ============
 echo "=========================================="
-echo "从视频提取帧"
+echo "MegaSaM 处理配置"
 echo "=========================================="
-echo "输入视频: $VIDEO_PATH"
+echo "场景名称: $SCENE_NAME"
+echo "输入目录: $DATA_DIR"
 echo "输出目录: $OUTPUT_DIR"
-echo "帧率: $FPS fps"
-echo "质量: $QUALITY"
-if [ -n "$START_TIME" ]; then
-    echo "开始时间: $START_TIME"
-fi
-if [ -n "$DURATION" ]; then
-    echo "持续时间: $DURATION"
-fi
+echo "重建目录: $RECON_DIR"
+echo "CVD输出目录: $CVD_OUTPUT_DIR"
+echo "GPU ID: $GPU_ID"
+echo "焦距优化: $OPT_FOCAL"
+echo "禁用可视化: $DISABLE_VIS"
 echo ""
 
-# ============ 获取视频信息 ============
-echo "视频信息:"
-ffprobe -v error -select_streams v:0 \
-    -show_entries stream=width,height,r_frame_rate,duration \
-    -of default=noprint_wrappers=1 "$VIDEO_PATH"
-echo ""
+# ============ 检查必需文件 ============
+echo "检查必需的模型文件..."
 
-# ============ 构建 ffmpeg 命令 ============
-FFMPEG_CMD="ffmpeg -i \"$VIDEO_PATH\""
-
-if [ -n "$START_TIME" ]; then
-    FFMPEG_CMD="$FFMPEG_CMD -ss $START_TIME"
+if [ ! -f "checkpoints/megasam_final.pth" ]; then
+    echo "错误: MegaSaM 模型不存在: checkpoints/megasam_final.pth"
+    exit 1
 fi
 
-if [ -n "$DURATION" ]; then
-    FFMPEG_CMD="$FFMPEG_CMD -t $DURATION"
+if [ "$SKIP_DEPTH" = false ]; then
+    if [ ! -f "Depth-Anything/checkpoints/depth_anything_vitl14.pth" ]; then
+        echo "错误: Depth-Anything 模型不存在"
+        exit 1
+    fi
 fi
 
-FFMPEG_CMD="$FFMPEG_CMD -r $FPS -qscale:v $QUALITY \"$OUTPUT_DIR/%05d.jpg\" -y"
+if [ "$SKIP_CVD" = false ] && [ ! -f "cvd_opt/raft-things.pth" ]; then
+    echo "警告: RAFT 模型不存在，将跳过 CVD 优化"
+    SKIP_CVD=true
+fi
 
-# ============ 提取帧 ============
-echo "正在提取帧..."
-echo "命令: $FFMPEG_CMD"
+if [ ! -d "$DATA_DIR" ]; then
+    echo "错误: 数据目录不存在: $DATA_DIR"
+    exit 1
+fi
+
+# 检查图像文件
+NUM_IMAGES=$(find "$DATA_DIR" -maxdepth 1 \( -name "*.jpg" -o -name "*.png" \) | wc -l)
+if [ "$NUM_IMAGES" -eq 0 ]; then
+    echo "错误: 在 $DATA_DIR 中没有找到图像文件"
+    exit 1
+fi
+
+echo "找到 $NUM_IMAGES 张图像"
+
+# 创建输出目录
+mkdir -p "$OUTPUT_DIR"
+mkdir -p "$RECON_DIR"
+mkdir -p "$DEPTH_ANYTHING_DIR"
+mkdir -p "$UNIDEPTH_DIR"
+mkdir -p "$CVD_OUTPUT_DIR"
+
+echo "已创建输出目录:"
+echo "  - $OUTPUT_DIR"
+echo "  - $RECON_DIR"
+echo "  - $CVD_OUTPUT_DIR"
+echo "  - $DEPTH_ANYTHING_DIR"
+echo "  - $UNIDEPTH_DIR"
 echo ""
 
-eval $FFMPEG_CMD
+# ============ 步骤 1: 预计算单目深度 ============
+if [ "$SKIP_DEPTH" = false ]; then
+    echo ""
+    echo "=========================================="
+    echo "步骤 1/3: 预计算单目深度"
+    echo "=========================================="
 
-# ============ 统计结果 ============
-NUM_FRAMES=$(find "$OUTPUT_DIR" -maxdepth 1 -name "*.jpg" | wc -l)
+    # Depth-Anything
+    echo "运行 Depth-Anything..."
+    CUDA_VISIBLE_DEVICES=$GPU_ID python Depth-Anything/run_videos.py \
+      --encoder vitl \
+      --load-from Depth-Anything/checkpoints/depth_anything_vitl14.pth \
+      --img-path "$DATA_DIR" \
+      --outdir "$DEPTH_ANYTHING_DIR/$SCENE_NAME"
 
+    echo "Depth-Anything 完成！"
+
+    # UniDepth
+    echo "运行 UniDepth..."
+    export PYTHONPATH="${PYTHONPATH}:$(pwd)/UniDepth"
+    CUDA_VISIBLE_DEVICES=$GPU_ID python UniDepth/scripts/demo_mega-sam.py \
+      --scene-name "$SCENE_NAME" \
+      --img-path "$DATA_DIR" \
+      --outdir "$UNIDEPTH_DIR"
+
+    echo "UniDepth 完成！"
+else
+    echo ""
+    echo "=========================================="
+    echo "跳过步骤 1: 深度预计算"
+    echo "=========================================="
+fi
+
+# ============ 步骤 2: 相机跟踪 ============
+if [ "$SKIP_TRACKING" = false ]; then
+    echo ""
+    echo "=========================================="
+    echo "步骤 2/3: 相机跟踪"
+    echo "=========================================="
+
+    TRACKING_ARGS="--datapath=$DATA_DIR \
+      --weights=checkpoints/megasam_final.pth \
+      --scene_name $SCENE_NAME \
+      --buffer 2048 \
+      --mono_depth_path $(pwd)/$DEPTH_ANYTHING_DIR \
+      --metric_depth_path $(pwd)/$UNIDEPTH_DIR \
+      --output_dir $OUTPUT_DIR \
+      --recon_dir $RECON_DIR"
+
+    if [ "$DISABLE_VIS" = true ]; then
+        TRACKING_ARGS="$TRACKING_ARGS --disable_vis"
+    fi
+
+    if [ "$OPT_FOCAL" = false ]; then
+        TRACKING_ARGS="$TRACKING_ARGS --no_opt_focal"
+    fi
+
+    echo "运行相机跟踪..."
+    CUDA_VISIBLE_DEVICES=$GPU_ID python camera_tracking_scripts/test_demo_v2.py $TRACKING_ARGS
+
+    echo "相机跟踪完成！"
+    echo "输出保存在:"
+    echo "  - $RECON_DIR/$SCENE_NAME/"
+    echo "  - $OUTPUT_DIR/${SCENE_NAME}_droid.npz"
+else
+    echo ""
+    echo "=========================================="
+    echo "跳过步骤 2: 相机跟踪"
+    echo "=========================================="
+fi
+
+# ============ 步骤 3: CVD 优化 ============
+if [ "$SKIP_CVD" = false ]; then
+    echo ""
+    echo "=========================================="
+    echo "步骤 3/3: 一致性视频深度优化"
+    echo "=========================================="
+
+    # 预处理光流
+    echo "预处理光流..."
+    CUDA_VISIBLE_DEVICES=$GPU_ID python cvd_opt/preprocess_flow_v2.py \
+      --datapath="$DATA_DIR" \
+      --model=cvd_opt/raft-things.pth \
+      --scene_name "$SCENE_NAME" \
+      --mixed_precision
+
+    echo "光流预处理完成！"
+
+    # CVD 优化
+    echo "运行 CVD 优化..."
+    CUDA_VISIBLE_DEVICES=$GPU_ID python cvd_opt/cvd_opt_v2.py \
+      --scene_name "$SCENE_NAME" \
+      --recon_dir "$RECON_DIR" \
+      --output_dir "$CVD_OUTPUT_DIR" \
+      --w_grad 2.0 \
+      --w_normal 5.0
+
+    echo "CVD 优化完成！"
+else
+    echo ""
+    echo "=========================================="
+    echo "跳过步骤 3: CVD 优化"
+    echo "=========================================="
+fi
+
+# ============ 完成 ============
 echo ""
 echo "=========================================="
-echo "完成！"
+echo "处理完成！"
 echo "=========================================="
-echo "提取了 $NUM_FRAMES 帧"
-echo "保存在: $OUTPUT_DIR"
 echo ""
-echo "下一步: 运行 MegaSaM"
-# 移除OUTPUT_DIR末尾的斜杠
-OUTPUT_DIR_CLEAN="${OUTPUT_DIR%/}"
-echo "  ./run_custom_video_v2.sh \\"
-echo "    --scene-name $(basename $OUTPUT_DIR_CLEAN) \\"
-echo "    --data-dir $OUTPUT_DIR_CLEAN \\"
-echo "    --output-dir $OUTPUT_DIR_CLEAN/outputs \\"
-echo "    --recon-dir $OUTPUT_DIR_CLEAN/reconstructions"
+echo "输出文件:"
+echo "  1. 相机轨迹: $OUTPUT_DIR/${SCENE_NAME}_droid.npz"
+echo "  2. 重建数据: $RECON_DIR/$SCENE_NAME/"
+if [ "$SKIP_CVD" = false ]; then
+    echo "  3. 优化深度: $CVD_OUTPUT_DIR/${SCENE_NAME}_sgd_cvd_hr.npz"
+fi
 echo ""
