@@ -3,6 +3,7 @@
 [中文文档](./README_CN.md) | English
 
 Original paper: CVPR 2025 (Best Paper Honorable Mention)
+
 [MegaSaM: Accurate, Fast and Robust Structure and Motion from Casual Dynamic Videos](https://github.com/mega-sam/mega-sam)
 
 This guide explains how to use the improved v2 scripts to process your own video data.
