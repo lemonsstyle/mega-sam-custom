@@ -279,10 +279,11 @@ if __name__ == "__main__":
 
   align_scale = scales[med_idx]
   align_shift = shifts[med_idx]
-  normalize_scale = (
-      np.percentile((align_scale * np.array(mono_disp_list) + align_shift), 98)
-      / 2.0
-  )
+  aligned_disp_flat = np.concatenate([
+      (align_scale * disp + align_shift).reshape(-1)
+      for disp in mono_disp_list
+  ])
+  normalize_scale = np.percentile(aligned_disp_flat, 98) / 2.0
 
   aligns = (align_scale, align_shift, normalize_scale)
 
